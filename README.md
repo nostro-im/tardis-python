@@ -19,10 +19,11 @@ pip install tardis-client
 
 ```python
 import asyncio
-from tardis_client import TardisClient, Channel
+from tardis_client import DataLakeClient, Channel
+
 
 async def replay():
-    tardis_client = TardisClient()
+    tardis_client = DataLakeClient()
 
     # replay method returns Async Generator
     # https://rickyhan.com/jekyll/update/2018/01/27/python36.html
@@ -30,7 +31,7 @@ async def replay():
         exchange="bitmex",
         from_date="2019-06-01",
         to_date="2019-06-02",
-        filters=[Channel(name="trade", symbols=["XBTUSD","ETHUSD"]), Channel("orderBookL2", ["XBTUSD"])],
+        filters=[Channel(name="trade", symbols=["XBTUSD", "ETHUSD"]), Channel("orderBookL2", ["XBTUSD"])],
     )
 
     # this will print all trades and orderBookL2 messages for XBTUSD
@@ -40,6 +41,7 @@ async def replay():
         # local timestamp is a Python datetime that marks timestamp when given message has been received
         # message is a message object as provided by exchange real-time stream
         print(message)
+
 
 asyncio.run(replay())
 ```
@@ -51,7 +53,7 @@ asyncio.run(replay())
 `tardis-client` package provides `TardisClient` and `Channel` classes.
 
 ```python
-from tardis_client import TardisClient, Channel
+from tardis_client import DataLakeClient, Channel
 ```
 
 ### TardisClient

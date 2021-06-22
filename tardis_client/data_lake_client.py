@@ -6,6 +6,8 @@ import os
 import tempfile
 import shutil
 
+import requests
+
 from time import time
 from typing import List, AsyncIterable
 from collections import namedtuple
@@ -23,14 +25,18 @@ DATE_MESSAGE_SPLIT_INDEX = 28
 DEFAULT_CACHE_DIR = os.path.join(tempfile.gettempdir(), ".tardis-cache")
 
 
-class TardisClient:
-    def __init__(self, endpoint="https://api.tardis.dev", cache_dir=DEFAULT_CACHE_DIR, api_key="", http_timeout=60, http_proxy=None):
+class DataLakeClient:
+    def __init__(self, endpoint="https://api.tardis.dev", cache_dir=DEFAULT_CACHE_DIR, api_key="", http_timeout=60, http_proxy=None,
+                 rest_api_url = "https://iijlm9hgoj.execute-api.us-east-2.amazonaws.com/First_Deploy/getmultycandles",
+                 rest_api_key = ""):
         self.logger = logging.getLogger(__name__)
         self.endpoint = endpoint
         self.cache_dir = cache_dir
         self.api_key = api_key
         self.http_timeout = http_timeout
         self.http_proxy = http_proxy
+        self.rest_api_url = rest_api_url
+        self.rest_api_key = rest_api_key
 
         self.logger.debug("initialized with: %s", {"endpoint": endpoint, "cache_dir": cache_dir, "api_key": api_key})
 
@@ -201,4 +207,27 @@ class TardisClient:
             return True
         except ValueError:
             return False
+
+    def get_historical_price(self, base_currency, counter_currency, end_time='', start_time='',
+                             limit='', exchange_name='Binance', bin_size='1m'):
+        assert (end_time and start_time) or ((end_time or start_time) and limit)
+
+        payload = {
+            'base_currency': base_currency,
+            'counter_currency': counter_currency,
+            'end_time': end_time,
+            'start_time': start_time,
+            'period': limit,
+            'provider_name': exchange_name,
+            'bin_size': bin_size
+        }
+        print(payload)
+        response = requests.get(url=self.rest_api_url, params=payload, headers=self.rest_api_key)
+        response.raise_for_status()
+        result = response.json()
+        if result == 'No results found':
+            raise Exception("404: No results found")
+        return result
+
+
 
