@@ -8,6 +8,8 @@ import shutil
 
 import requests
 
+import vertica_python
+
 from time import time
 from typing import List, AsyncIterable
 from collections import namedtuple
@@ -28,7 +30,8 @@ DEFAULT_CACHE_DIR = os.path.join(tempfile.gettempdir(), ".tardis-cache")
 class DataLakeClient:
     def __init__(self, endpoint="https://api.tardis.dev", cache_dir=DEFAULT_CACHE_DIR, api_key="", http_timeout=60, http_proxy=None,
                  rest_api_url = "https://iijlm9hgoj.execute-api.us-east-2.amazonaws.com/First_Deploy/getmultycandles",
-                 rest_api_key = ""):
+                 rest_api_key = "",
+                 vertica_connection_info = {}):
         self.logger = logging.getLogger(__name__)
         self.endpoint = endpoint
         self.cache_dir = cache_dir
@@ -37,6 +40,7 @@ class DataLakeClient:
         self.http_proxy = http_proxy
         self.rest_api_url = rest_api_url
         self.rest_api_key = rest_api_key
+        self.vertica_connection_info = vertica_connection_info
 
         self.logger.debug("initialized with: %s", {"endpoint": endpoint, "cache_dir": cache_dir, "api_key": api_key})
 
@@ -229,5 +233,65 @@ class DataLakeClient:
             raise Exception("404: No results found")
         return result
 
+    def get_data_from_vertica(self, base_currency, counter_currency, end_time='', start_time='',
+                             provider_name='', exchange_name='Binance', bin_size='1m'):
 
+        assert (end_time and start_time)
+
+        class DateTimeEncoder(default_json.JSONEncoder):
+            def default(self, o):
+                if isinstance(o, datetime):
+                    return o.isoformat()
+                return default_json.JSONEncoder.default(self, o)
+
+        def FormatChanger(date):
+            return datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+
+        # Default Params
+        error = None
+
+        table_name = 'cryptocompare_ohlcv_' + bin_size
+
+        try:
+            connection = vertica_python.connect(**self.vertica_connection_info)
+            cur = connection.cursor()
+            output = []
+            try:
+                cur.execute("""SELECT time AS date, close, high, low, open, volumefrom, volumeto FROM {}
+                         WHERE fsym = :base_currency AND tsym = :counter_currency
+                             AND
+                         time BETWEEN DATE(:start_time) AND DATE(:end_time)
+                             AND
+                         exchange = :exchange_name""".format(table_name),
+                            {'base_currency' : base_currency,
+                             'counter_currency' : counter_currency,
+                             'start_time' : start_time,
+                             'end_time' : end_time,
+                             'exchange_name' : exchange_name})
+
+                columns = cur.description
+                result = [{columns[index][0]: column for index, column in enumerate(value)} for value in cur.fetchall()]
+                for row in result:
+                    finall_result = {"time": int(row["date"].timestamp())}
+                    row["date"] = default_json.dumps(row["date"], cls=DateTimeEncoder).replace('"', '').replace('T', ' ')
+                    finall_result.update(row)
+                    output.append(finall_result)
+
+            except vertica_python.errors.QueryError as err:
+                error = "Error: {}".format(err.message)
+                # print("Error is: ")
+                # print(error)
+
+        finally:
+            connection.close()
+
+        if error is not None:
+            return {
+                'body': default_json.dumps(error)
+            }
+        else:
+            return {
+                'statusCode': 200,
+                'body': default_json.dumps(output)
+            }
 

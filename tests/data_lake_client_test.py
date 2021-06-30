@@ -87,3 +87,21 @@ def _test_get_multi_minutes_candles_on_provider(tested_data_size, end_time=None,
 
     assert isinstance(first_candle['time'], int), \
         f"time should be unix, found {type(first_candle['time'])} instead"
+
+def test_vertica():
+
+    connection_info = { 'host': 'Vertica-e289fabe22e302d4.elb.eu-central-1.amazonaws.com',
+                        'port': '45986',
+                        'user': 'dbadmin',
+                        'password': 'zxky2knDyi3#qQ7N',
+                        'database': 'VerticaDB',
+                        'connection_timeout': 5
+    }
+
+    data_lake_client = DataLakeClient(vertica_connection_info=connection_info)
+
+    data = data_lake_client.get_data_from_vertica(base_currency='BTG', counter_currency='BTC',
+                                                  end_time='2021-05-13 23:59:59.0', start_time='2021-05-13 00:00:00.0',
+                                                  bin_size='10m')
+
+    assert data['statusCode'] == 200
